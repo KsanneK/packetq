@@ -11,7 +11,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
-	defer listener.Close()
+	defer func() {
+		if err := listener.Close(); err != nil {
+			log.Printf("Error closing listener: %v", err)
+		}
+	}()
 
 	fmt.Println("Server started on :9099")
 
@@ -26,7 +30,11 @@ func main() {
 }
 
 func handleConnection(conn net.Conn) {
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			log.Printf("Error closing connection: %v", err)
+		}
+	}()
 
 	log.Printf("New connection: %s", conn.RemoteAddr())
 }

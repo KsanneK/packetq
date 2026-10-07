@@ -1,9 +1,12 @@
 package server
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"net"
+
+	"github.com/KsanneK/packetq/internal/protocol"
 )
 
 type Server struct {
@@ -45,6 +48,32 @@ func (s *Server) handleConnection(conn net.Conn) {
 			log.Printf("Error closing connection: %v", err)
 		}
 	}()
-
 	log.Printf("New connection: %s", conn.RemoteAddr())
+
+	scanner := bufio.NewScanner(conn)
+	for scanner.Scan() {
+		line := scanner.Text()
+		cmd, err := protocol.ParseCommand(line)
+		if err != nil {
+			fmt.Println("Error parsing command:", err)
+			continue
+		}
+		switch cmd.Type {
+		case protocol.CmdPing:
+			if _, err := conn.Write([]byte("PONG\n")); err != nil {
+				log.Printf("Error writing to connection %s: %v", conn.RemoteAddr(), err)
+			}
+		case protocol.CmdQuit:
+			log.Printf("Closing connection: %s", conn.RemoteAddr())
+			return
+		case protocol.CmdSubscribe:
+			fmt.Println("SUB", cmd.Payload)
+		case protocol.CmdPublish:
+			fmt.Println("PUB", cmd.Payload)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Printf("Error reading from connection: %v", err)
+	}
 }

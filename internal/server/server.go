@@ -95,7 +95,9 @@ func (s *Server) handleConnection(conn net.Conn) {
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
 		line := scanner.Text()
-		s.handleMessage(sub, conn, line)
+		if !s.handleMessage(sub, conn, line) {
+			break
+		}
 	}
 
 	if err := scanner.Err(); err != nil && !errors.Is(err, net.ErrClosed) {
@@ -103,11 +105,11 @@ func (s *Server) handleConnection(conn net.Conn) {
 	}
 }
 
-func (s *Server) handleMessage(sub *broker.Subscriber, conn net.Conn, line string) {
+func (s *Server) handleMessage(sub *broker.Subscriber, conn net.Conn, line string) bool {
 	cmd, err := protocol.ParseCommand(line)
 	if err != nil {
 		fmt.Println("Error parsing command:", err)
-		return
+		return true
 	}
 	switch cmd.Type {
 	case protocol.CmdPing:
@@ -116,7 +118,7 @@ func (s *Server) handleMessage(sub *broker.Subscriber, conn net.Conn, line strin
 		}
 	case protocol.CmdQuit:
 		log.Printf("Closing connection: %s", conn.RemoteAddr())
-		conn.Close()
+		return false
 	case protocol.CmdSubscribe:
 		topic := cmd.Payload[0]
 		sub.Subscribe(topic)
@@ -135,6 +137,7 @@ func (s *Server) handleMessage(sub *broker.Subscriber, conn net.Conn, line strin
 			log.Printf("Subscriber %s published message %s to topic %s", sub.ID, message, topic)
 		}
 	}
+	return true
 }
 
 func (s *Server) listenForMessages(sub *broker.Subscriber, conn net.Conn, done chan struct{}) {

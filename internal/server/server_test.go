@@ -48,7 +48,7 @@ func TestServer_Ping(t *testing.T) {
 	defer cleanup()
 
 	conn, scanner := dialClient(t, srv.Addr())
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if _, err := fmt.Fprintf(conn, "PING\n"); err != nil {
 		t.Fatalf("failed to write PING: %v", err)
@@ -69,7 +69,7 @@ func TestServer_PubSub(t *testing.T) {
 
 	// Subscriber
 	subConn, subScanner := dialClient(t, srv.Addr())
-	defer subConn.Close()
+	defer func() { _ = subConn.Close() }()
 
 	if _, err := fmt.Fprintf(subConn, "SUB news\n"); err != nil {
 		t.Fatalf("failed to send SUB: %v", err)
@@ -83,7 +83,7 @@ func TestServer_PubSub(t *testing.T) {
 
 	// Publisher
 	pubConn, pubScanner := dialClient(t, srv.Addr())
-	defer pubConn.Close()
+	defer func() { _ = pubConn.Close() }()
 
 	if _, err := fmt.Fprintf(pubConn, "PUB news Hello from packetq!\n"); err != nil {
 		t.Fatalf("failed to send PUB: %v", err)
@@ -111,19 +111,25 @@ func TestServer_MultipleSubscribers(t *testing.T) {
 
 	// Two subscriber connections to the same topic
 	sub1Conn, sub1Scanner := dialClient(t, srv.Addr())
-	defer sub1Conn.Close()
-	fmt.Fprintf(sub1Conn, "SUB tech\n")
+	defer func() { _ = sub1Conn.Close() }()
+	if _, err := fmt.Fprintf(sub1Conn, "SUB tech\n"); err != nil {
+		t.Fatalf("failed to send SUB: %v", err)
+	}
 	sub1Scanner.Scan() // read "OK"
 
 	sub2Conn, sub2Scanner := dialClient(t, srv.Addr())
-	defer sub2Conn.Close()
-	fmt.Fprintf(sub2Conn, "SUB tech\n")
+	defer func() { _ = sub2Conn.Close() }()
+	if _, err := fmt.Fprintf(sub2Conn, "SUB tech\n"); err != nil {
+		t.Fatalf("failed to send SUB: %v", err)
+	}
 	sub2Scanner.Scan() // read "OK"
 
 	// Message publishing
 	pubConn, pubScanner := dialClient(t, srv.Addr())
-	defer pubConn.Close()
-	fmt.Fprintf(pubConn, "PUB tech Go 1.27 is awesome\n")
+	defer func() { _ = pubConn.Close() }()
+	if _, err := fmt.Fprintf(pubConn, "PUB tech Go 1.27 is awesome\n"); err != nil {
+		t.Fatalf("failed to send PUB: %v", err)
+	}
 	pubScanner.Scan() // read "OK"
 
 	expected := "MSG tech Go 1.27 is awesome"
@@ -144,7 +150,7 @@ func TestServer_Quit(t *testing.T) {
 	defer cleanup()
 
 	conn, scanner := dialClient(t, srv.Addr())
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if _, err := fmt.Fprintf(conn, "QUIT\n"); err != nil {
 		t.Fatalf("failed to write QUIT: %v", err)

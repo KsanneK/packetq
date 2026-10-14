@@ -19,7 +19,7 @@ type Broker struct {
 
 type Subscriber struct {
 	ID       string
-	Messages chan string
+	Messages chan Message
 	broker   *Broker
 }
 
@@ -38,7 +38,7 @@ func (b *Broker) run() {
 		subs := b.getSubscribers(msg.Topic)
 		for _, sub := range subs {
 			select {
-			case sub.Messages <- msg.Body:
+			case sub.Messages <- msg:
 			default:
 				log.Printf("Subscriber %s is slow, dropping message", sub.ID)
 			}
@@ -62,7 +62,7 @@ func (b *Broker) NewSubscriber(id string) *Subscriber {
 
 	sub := &Subscriber{
 		ID:       id,
-		Messages: make(chan string, 100),
+		Messages: make(chan Message, 100),
 		broker:   b,
 	}
 

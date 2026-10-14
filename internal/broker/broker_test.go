@@ -18,8 +18,8 @@ func TestSubscriber_SubscribeAndPublish(t *testing.T) {
 
 	select {
 	case received := <-sub.Messages:
-		if received != msg {
-			t.Fatalf("expected message %q, got %q", msg, received)
+		if received.Body != msg || received.Topic != "news" {
+			t.Fatalf("expected message {Topic: news, Body: %q}, got %+v", msg, received)
 		}
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("timed out waiting for message")
@@ -36,7 +36,7 @@ func TestSubscriber_PublishOnlyToSubscribedTopic(t *testing.T) {
 
 	select {
 	case msg := <-sub.Messages:
-		t.Fatalf("received unexpected message: %q", msg)
+		t.Fatalf("received unexpected message: %+v", msg)
 	case <-time.After(50 * time.Millisecond):
 	}
 }
@@ -52,7 +52,7 @@ func TestSubscriber_Unsubscribe(t *testing.T) {
 
 	select {
 	case msg := <-sub.Messages:
-		t.Fatalf("received message after unsubscribe: %q", msg)
+		t.Fatalf("received message after unsubscribe: %+v", msg)
 	case <-time.After(50 * time.Millisecond):
 	}
 }
@@ -71,7 +71,7 @@ func TestSubscriber_Close(t *testing.T) {
 
 	select {
 	case msg := <-sub.Messages:
-		t.Fatalf("received message after Close: %q", msg)
+		t.Fatalf("received message after Close: %+v", msg)
 	case <-time.After(50 * time.Millisecond):
 	}
 }
@@ -90,8 +90,8 @@ func TestBroker_MultipleSubscribers(t *testing.T) {
 	for _, sub := range []*broker.Subscriber{sub1, sub2} {
 		select {
 		case msg := <-sub.Messages:
-			if msg != "go 1.27 released" {
-				t.Fatalf("expected 'go 1.27 released', got %q", msg)
+			if msg.Body != "go 1.27 released" || msg.Topic != "tech" {
+				t.Fatalf("expected message {Topic: tech, Body: 'go 1.27 released'}, got %+v", msg)
 			}
 		case <-time.After(100 * time.Millisecond):
 			t.Fatalf("timeout waiting for message for %s", sub.ID)

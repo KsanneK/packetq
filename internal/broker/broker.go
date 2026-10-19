@@ -1,7 +1,7 @@
 package broker
 
 import (
-	"log"
+	"log/slog"
 	"sync"
 )
 
@@ -40,7 +40,7 @@ func (b *Broker) run() {
 			select {
 			case sub.Messages <- msg:
 			default:
-				log.Printf("Subscriber %s is slow, dropping message", sub.ID)
+				slog.Warn("subscriber is slow, dropping message", "sub", sub.ID, "topic", msg.Topic)
 			}
 		}
 	}

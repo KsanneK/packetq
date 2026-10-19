@@ -4,13 +4,15 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"strings"
 
 	"github.com/KsanneK/packetq/internal/broker"
 	"github.com/KsanneK/packetq/internal/protocol"
 )
+
+var ErrQuit = errors.New("client requested quit")
 
 type Server struct {
 	addr     string
@@ -28,7 +30,7 @@ func NewServer(addr string) *Server {
 func (s *Server) Listen() error {
 	listener, err := net.Listen("tcp", s.addr)
 	if err != nil {
-		return fmt.Errorf("failed to start server: %w", err)
+		return fmt.Errorf("server start failed: %w", err)
 	}
 	s.listener = listener
 	return nil
@@ -41,7 +43,7 @@ func (s *Server) Serve() error {
 		}
 	}()
 
-	fmt.Println("Server started on", s.Addr())
+	slog.Info("server started", "addr", s.Addr())
 
 	for {
 		conn, err := s.listener.Accept()
@@ -49,7 +51,7 @@ func (s *Server) Serve() error {
 			if errors.Is(err, net.ErrClosed) {
 				return nil
 			}
-			log.Printf("Error accepting connection: %v", err)
+			slog.Warn("accept connection failed", "err", err)
 			continue
 		}
 		go s.handleConnection(conn)
@@ -80,13 +82,13 @@ func (s *Server) Close() error {
 func (s *Server) handleConnection(conn net.Conn) {
 	defer func() {
 		if err := conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			log.Printf("Error closing connection: %v", err)
+			slog.Warn("connection close failed", "err", err)
 		}
 	}()
 	done := make(chan struct{})
 	defer close(done)
 
-	log.Printf("New connection: %s", conn.RemoteAddr())
+	slog.Info("new connection", "addr", conn.RemoteAddr())
 
 	sub := s.broker.NewSubscriber(conn.RemoteAddr().String())
 	defer sub.Close()
@@ -95,49 +97,51 @@ func (s *Server) handleConnection(conn net.Conn) {
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if !s.handleMessage(sub, conn, line) {
-			break
+		err := s.handleMessage(sub, conn, line)
+		if err != nil {
+			if errors.Is(err, ErrQuit) {
+				break
+			}
+			slog.Warn("handle message failed", "err", err)
 		}
 	}
 
 	if err := scanner.Err(); err != nil && !errors.Is(err, net.ErrClosed) {
-		log.Printf("Error reading from connection: %v", err)
+		slog.Warn("read connection failed", "err", err)
 	}
 }
 
-func (s *Server) handleMessage(sub *broker.Subscriber, conn net.Conn, line string) bool {
+func (s *Server) handleMessage(sub *broker.Subscriber, conn net.Conn, line string) error {
 	cmd, err := protocol.ParseCommand(line)
 	if err != nil {
-		fmt.Println("Error parsing command:", err)
-		return true
+		return fmt.Errorf("error parsing command: %w", err)
 	}
 	switch cmd.Type {
 	case protocol.CmdPing:
+		slog.Debug("ping", "addr", conn.RemoteAddr())
 		if _, err := conn.Write([]byte("PONG\n")); err != nil {
-			log.Printf("Error writing to connection %s: %v", conn.RemoteAddr(), err)
+			return fmt.Errorf("error writing to connection %s: %v", conn.RemoteAddr(), err)
 		}
 	case protocol.CmdQuit:
-		log.Printf("Closing connection: %s", conn.RemoteAddr())
-		return false
+		slog.Debug("quit", "addr", conn.RemoteAddr())
+		return ErrQuit
 	case protocol.CmdSubscribe:
 		topic := cmd.Payload[0]
 		sub.Subscribe(topic)
 		if _, err := conn.Write([]byte("OK\n")); err != nil {
-			log.Printf("Error writing to connection %s: %v", conn.RemoteAddr(), err)
-		} else {
-			log.Printf("Subscriber %s subscribed to topic %s", sub.ID, topic)
+			return fmt.Errorf("error writing to connection %s: %v", conn.RemoteAddr(), err)
 		}
+		slog.Debug("subscribed to topic", "addr", conn.RemoteAddr(), "topic", topic)
 	case protocol.CmdPublish:
 		topic := cmd.Payload[0]
 		message := cmd.Payload[1:]
 		s.broker.Publish(topic, strings.Join(message, " "))
 		if _, err := conn.Write([]byte("OK\n")); err != nil {
-			log.Printf("Error writing to connection %s: %v", conn.RemoteAddr(), err)
-		} else {
-			log.Printf("Subscriber %s published message %s to topic %s", sub.ID, message, topic)
+			return fmt.Errorf("error writing to connection %s: %v", conn.RemoteAddr(), err)
 		}
+		slog.Debug("message published", "addr", conn.RemoteAddr(), "topic", topic, "message", strings.Join(message, " "))
 	}
-	return true
+	return nil
 }
 
 func (s *Server) listenForMessages(sub *broker.Subscriber, conn net.Conn, done chan struct{}) {
@@ -145,7 +149,7 @@ func (s *Server) listenForMessages(sub *broker.Subscriber, conn net.Conn, done c
 		select {
 		case message := <-sub.Messages:
 			if _, err := fmt.Fprintf(conn, "MSG %s %s\n", message.Topic, message.Body); err != nil {
-				log.Printf("Error writing to connection %s: %v", conn.RemoteAddr(), err)
+				slog.Warn("connection write failed", "addr", conn.RemoteAddr(), "err", err)
 			}
 		case <-done:
 			return

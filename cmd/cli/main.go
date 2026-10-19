@@ -8,10 +8,15 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/KsanneK/packetq/internal/version"
 	"github.com/KsanneK/packetq/pkg/client"
 )
 
 func main() {
+	if len(os.Args) > 1 && (os.Args[1] == "-v" || os.Args[1] == "--version" || os.Args[1] == "version") {
+		fmt.Println(version.Info())
+		os.Exit(0)
+	}
 	if err := run(os.Args[1:]); err != nil {
 		if !errors.Is(err, flag.ErrHelp) {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)

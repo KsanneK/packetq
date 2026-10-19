@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"net"
 	"testing"
@@ -25,7 +26,10 @@ func startTestServer(t *testing.T) (*server.Server, func()) {
 	cleanup := func() {
 		_ = srv.Close()
 		select {
-		case <-errCh:
+		case err := <-errCh:
+			if err != nil && !errors.Is(err, net.ErrClosed) {
+				t.Logf("server shutdown error: %v", err)
+			}
 		case <-time.After(500 * time.Millisecond):
 		}
 	}

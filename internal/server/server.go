@@ -10,6 +10,7 @@ import (
 
 	"github.com/KsanneK/packetq/internal/broker"
 	"github.com/KsanneK/packetq/internal/protocol"
+	"github.com/KsanneK/packetq/internal/version"
 )
 
 var ErrQuit = errors.New("client requested quit")
@@ -43,7 +44,7 @@ func (s *Server) Serve() error {
 		}
 	}()
 
-	slog.Info("server started", "addr", s.Addr())
+	slog.Info("server started", "addr", s.Addr(), "version", version.Version)
 
 	for {
 		conn, err := s.listener.Accept()

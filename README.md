@@ -52,7 +52,43 @@ PUB news Hello World!
 # MSG news Hello World!
 ```
 
-### 3. Use the Go Client Library (`pkg/client`)
+### 3. CLI Tool (`packetq`)
+
+You can build and use the dedicated CLI tool to publish and subscribe to messages:
+
+#### Building:
+```bash
+# Build the binary in the current directory
+go build -o packetq ./cmd/cli
+
+# Optionally install to $GOPATH/bin (available globally)
+go install ./cmd/cli
+```
+
+#### Publishing (`pub`):
+```bash
+./packetq pub <topic> <message>
+
+# Example using default address (localhost:9099):
+./packetq pub news "Go 1.27 released!"
+
+# Specify custom broker address:
+./packetq pub -addr localhost:9099 alerts "High CPU usage"
+```
+
+#### Subscribing (`sub`):
+The CLI supports subscribing to single or multiple topics simultaneously using the Fan-In pattern:
+```bash
+./packetq sub <topic1> [topic2...]
+
+# Subscribe to a single topic:
+./packetq sub news
+
+# Subscribe to multiple topics at once:
+./packetq sub news alerts metrics
+```
+
+### 4. Use the Go Client Library (`pkg/client`)
 ```go
 package main
 
@@ -101,7 +137,7 @@ go test -race -v -count=1 ./...
 - [x] Core TCP protocol & packet parsing
 - [x] Thread-safe in-memory broker, topics & pub/sub routing
 - [x] Official Go client library (`pkg/client`) with async stream multiplexing
-- [ ] Interactive terminal CLI (`cmd/cli`)
+- [x] Interactive terminal CLI (`cmd/cli`)
 - [ ] Client authentication & access control (`AUTH <user> <pass>` / token)
 - [ ] Persistent disk storage (WAL / append-only log)
 - [ ] Consumer groups & message acknowledgments (ACK/NACK)

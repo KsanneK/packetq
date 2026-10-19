@@ -2,8 +2,9 @@ package main
 
 import (
 	"flag"
-	"log"
+	"log/slog"
 	"net"
+	"os"
 	"strconv"
 
 	"github.com/KsanneK/packetq/internal/server"
@@ -12,11 +13,21 @@ import (
 func main() {
 	host := flag.String("host", "localhost", "host address to listen on")
 	port := flag.Int("port", 9099, "port to listen on")
+	debug := flag.Bool("debug", false, "enable debug logging")
 	flag.Parse()
+
+	var level slog.Level
+	if *debug {
+		level = slog.LevelDebug
+	} else {
+		level = slog.LevelInfo
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
 
 	addr := net.JoinHostPort(*host, strconv.Itoa(*port))
 	srv := server.NewServer(addr)
 	if err := srv.Start(); err != nil {
-		log.Fatalf("Server error: %v", err)
+		slog.Error("server error", "err", err)
+		os.Exit(1)
 	}
 }

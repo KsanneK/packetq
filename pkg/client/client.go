@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"sync"
@@ -61,8 +60,7 @@ func (c *Client) Ping() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if _, err := c.conn.Write([]byte("PING\n")); err != nil {
-		log.Println("Error pinging server:", err)
-		return err
+		return fmt.Errorf("pinging server: %w", err)
 	}
 	resp := <-c.cmdResp
 	if resp != RespPong {
@@ -75,8 +73,7 @@ func (c *Client) Publish(topic, message string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if _, err := c.conn.Write([]byte("PUB " + topic + " " + message + "\n")); err != nil {
-		log.Println("Error publishing message:", err)
-		return err
+		return fmt.Errorf("publishing message: %w", err)
 	}
 	resp := <-c.cmdResp
 	if resp != RespOK {
@@ -90,8 +87,7 @@ func (c *Client) Subscribe(topic string) (<-chan Message, error) {
 	defer c.mu.Unlock()
 
 	if _, err := c.conn.Write([]byte("SUB " + topic + "\n")); err != nil {
-		log.Println("Error subscribing to topic:", err)
-		return nil, err
+		return nil, fmt.Errorf("subscribing to topic: %w", err)
 	}
 	resp := <-c.cmdResp
 	if resp != RespOK {
@@ -116,7 +112,6 @@ func (c *Client) listenLoop() {
 	for c.scanner.Scan() {
 		line := c.scanner.Text()
 		if err := c.handleMessage(line); err != nil {
-			fmt.Println("Error parsing message:", err)
 			continue
 		}
 	}
